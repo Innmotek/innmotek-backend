@@ -22,15 +22,40 @@ const faqRoutes = require('./faq.routes');
 const pageRoutes = require('./page.routes');
 const pluginRoutes = require('./plugin.routes');
 
-// Health check route
-router.get('/health', (req, res) => {
-  res.json({
-    result: 'success',
-    service: 'innmotek-backend-v2',
-    status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
-});
+const db = require('../config/database');
+
+// Live Database-Pinging Health Check (prevents Render sleep & Supabase auto-pause)
+async function handleHealthCheck(req, res) {
+  try {
+    const dbStatus = await db.ping();
+    return res.status(200).json({
+      result: 'success',
+      service: 'innmotek-backend-v2',
+      status: 'healthy',
+      database: {
+        status: 'connected',
+        provider: dbStatus.provider,
+        db_time: dbStatus.db_time,
+        latency_ms: dbStatus.latency_ms
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[Health Check Error]:', err.message);
+    return res.status(503).json({
+      result: 'error',
+      service: 'innmotek-backend-v2',
+      status: 'unhealthy',
+      database: {
+        status: 'disconnected',
+        error: err.message
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+router.get('/health', handleHealthCheck);
 
 // Mount authentication & admin management routes
 router.use('/', authRoutes);

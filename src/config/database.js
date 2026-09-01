@@ -352,6 +352,35 @@ class Database {
     }
   }
 
+  async ping() {
+    if (this.pool) {
+      const start = Date.now();
+      const res = await this.pool.query('SELECT NOW() as db_time, 1 as active');
+      const latencyMs = Date.now() - start;
+      return {
+        active: true,
+        db_time: res.rows[0].db_time,
+        latency_ms: latencyMs,
+        provider: 'Supabase PostgreSQL'
+      };
+    }
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const { createClient } = require('@supabase/supabase-js');
+      const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const start = Date.now();
+      const { error } = await client.from('categories').select('id').limit(1);
+      if (error) throw error;
+      const latencyMs = Date.now() - start;
+      return {
+        active: true,
+        db_time: new Date().toISOString(),
+        latency_ms: latencyMs,
+        provider: 'Supabase REST'
+      };
+    }
+    throw new Error('No database connection available');
+  }
+
   table(name) {
     if (!this.tables[name]) {
       const allowedCols = this.tableColumns[name] || [];

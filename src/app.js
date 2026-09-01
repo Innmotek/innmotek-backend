@@ -62,8 +62,41 @@ app.use((req, res, next) => {
   next();
 });
 
+const db = require('./config/database');
+
 // Serve public static assets (favicons, etc.)
 app.use(express.static(path.resolve(__dirname, '../public')));
+
+// Root Health Check Route (Live DB Ping - for UptimeRobot / external monitors)
+app.get('/health', async (req, res) => {
+  try {
+    const dbStatus = await db.ping();
+    return res.status(200).json({
+      result: 'success',
+      service: 'innmotek-backend-v2',
+      status: 'healthy',
+      database: {
+        status: 'connected',
+        provider: dbStatus.provider,
+        db_time: dbStatus.db_time,
+        latency_ms: dbStatus.latency_ms
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[Health Check Error]:', err.message);
+    return res.status(503).json({
+      result: 'error',
+      service: 'innmotek-backend-v2',
+      status: 'unhealthy',
+      database: {
+        status: 'disconnected',
+        error: err.message
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Root Status Landing Page - Minimal & Clean
 app.get('/', (req, res) => {
