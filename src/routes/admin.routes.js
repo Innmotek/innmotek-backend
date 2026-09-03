@@ -29,6 +29,7 @@ const testimonialAdmin = require('../controllers/admin/testimonial.admin.control
 const brandAdmin = require('../controllers/admin/brand.admin.controller');
 const faqAdmin = require('../controllers/admin/faq.admin.controller');
 const pageAdmin = require('../controllers/admin/page.admin.controller');
+const cleanupAdmin = require('../controllers/admin/cleanup.admin.controller');
 const { authenticate } = require('../middlewares/auth.middleware');
 
 // Apply JWT authentication guard to all administrative endpoints
@@ -103,5 +104,9 @@ router.get('/admin/pages/:id', pageAdmin.show);
 router.post('/admin/pages', pageAdmin.store);
 router.put('/admin/pages/:id', pageAdmin.update);
 router.delete('/admin/pages/:id', pageAdmin.destroy);
+
+// Data Cleanup & Bulk Purge
+router.get('/admin/cleanup/search', cleanupAdmin.search);
+router.post('/admin/cleanup/delete', cleanupAdmin.destroyBulk);
 
 module.exports = router;
