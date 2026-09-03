@@ -21,6 +21,7 @@ const brandRoutes = require('./brand.routes');
 const faqRoutes = require('./faq.routes');
 const pageRoutes = require('./page.routes');
 const pluginRoutes = require('./plugin.routes');
+const subscriberRoutes = require('./subscriber.routes');
 
 const db = require('../config/database');
 
@@ -73,5 +74,6 @@ router.use('/', brandRoutes);
 router.use('/', faqRoutes);
 router.use('/', pageRoutes);
 router.use('/', pluginRoutes);
+router.use('/subscribers', subscriberRoutes);
 
 module.exports = router;
