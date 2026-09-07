@@ -13,17 +13,26 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http:/
   .map(o => o.trim())
   .filter(Boolean);
 
+// Flexible CORS: Whitelist + Vercel deployments + Official domains
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true; // Allow server-to-server or curl requests
+  if (allowedOrigins.includes(origin)) return true;
+  if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/.*\.vercel\.app$/.test(origin)) return true;
+  if (/^https:\/\/(www\.)?innmotek\.com$/.test(origin)) return true;
+  return false;
+};
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser / server-to-server requests without origin header
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`[CORS Blocked] Origin '${origin}' is not permitted.`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'apikey', 'ApiKey'],
   credentials: false
 }));
 
