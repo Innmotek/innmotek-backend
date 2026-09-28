@@ -35,6 +35,32 @@ const { authenticate } = require('../middlewares/auth.middleware');
 // Apply JWT authentication guard to all administrative endpoints
 router.use('/admin', authenticate);
 
+// Live Dashboard Stats (Auto-updates dynamically when items are added or deleted)
+router.get('/admin/stats', (req, res) => {
+  try {
+    const db = require('../config/database');
+    const excludedSlugs = ['home', 'faqs', 'blogs', 'projects', 'services', 'testimonials', 'brands', 'categories', 'products'];
+
+    return res.json({
+      result: 'success',
+      stats: {
+        categories: db.table('categories').rows.length,
+        products: db.table('products').rows.length,
+        banners: db.table('banners').rows.length,
+        blogs: db.table('blogs').rows.length,
+        projects: db.table('projects').rows.length,
+        services: db.table('services').rows.length,
+        testimonials: db.table('testimonials').rows.length,
+        brands: db.table('brands').rows.length,
+        faqs: db.table('faqs').rows.length,
+        pages: db.table('pages').rows.filter(p => !excludedSlugs.includes(p.slug)).length
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ result: 'error', message: err.message });
+  }
+});
+
 // Categories
 router.get('/admin/categories', categoryAdmin.index);
 router.get('/admin/categories/:id', categoryAdmin.show);

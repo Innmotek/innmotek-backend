@@ -424,6 +424,18 @@ class Database {
     for (const [tableName, rows] of Object.entries(tableData)) {
       this.tables[tableName] = new TableRepository(tableName, rows, this.pool, Object.keys(rows[0] || {}));
     }
+
+    // Always keep fake/dummy services and testimonials cleared
+    this.tables['services'] = new TableRepository('services', [], this.pool, []);
+    this.tables['testimonials'] = new TableRepository('testimonials', [], this.pool, []);
+
+    // Ensure about-us page has canonical approved description
+    const aboutPage = this.tables['pages']?.rows.find(p => p.slug === 'about-us');
+    if (aboutPage) {
+      aboutPage.image = aboutPage.image || 'https://fqrmvgfbrcgyszgefzlp.supabase.co/storage/v1/object/public/products/3e12ee32-093e-43f5-87ab-d90b53a3f6bc.webp';
+      aboutPage.description = '<p>Founded on the principles of precision thermodynamic engineering, Innmotek bridges the gap between European HVAC technology and regional Himalayan climatic requirements. Our systems are engineered to operate seamlessly from sweltering sub-tropical plains to freezing mountain peaks.</p><p>By utilizing ambient heat from the atmosphere, our aerothermal heat pumps achieve coefficients of performance (COP) exceeding 4.2—meaning every unit of electrical energy yields over four units of usable thermal output.</p>';
+    }
+
     console.log(`[DB] Loaded ${Object.keys(this.tables).length} tables from static SQL dump.`);
   }
 

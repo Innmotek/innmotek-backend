@@ -52,9 +52,23 @@ function formatProductDetail(product) {
     slug: img.slug || product.slug
   }));
 
+  // Lookup category information for breadcrumbs and navigation
+  let categoryInfo = null;
+  if (product.category_id) {
+    const cat = db.table('categories').find(product.category_id);
+    if (cat) {
+      categoryInfo = {
+        id: cat.id,
+        title: cat.title,
+        slug: cat.slug
+      };
+    }
+  }
+
   return {
     slug: product.slug,
     title: product.title,
+    category: categoryInfo,
     description: product.description || null,
     summary: product.summary || null,
     warrenty: product.warrenty || null,
@@ -78,12 +92,13 @@ function formatFeaturedProducts(products) {
   if (!Array.isArray(products)) return [];
 
   return products.map(item => {
-    // Normalizes slugs for direct standalone landing pages if matched, otherwise uses standard product route
-    let slug = `/products/${item.slug}`;
+    // Return clean slug without redundant /products/ prefix
+    let cleanSlug = (item.slug || '').replace(/^\/+products\/+/, '').replace(/^\/+/, '');
+    let slug = cleanSlug;
     if (item.title === 'Full Inverter Dehumidify360' || item.slug === 'dehumidifier') {
-      slug = '/dehumidifier';
+      slug = 'dehumidifier';
     } else if (item.title === 'Wireless Robotic Pool cleaner' || item.slug === 'robotic-pool-cleaner') {
-      slug = '/robotic-pool-cleaner';
+      slug = 'robotic-pool-cleaner';
     }
 
     return {
