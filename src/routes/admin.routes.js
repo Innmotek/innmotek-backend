@@ -75,12 +75,14 @@ router.post('/admin/products', productAdmin.store);
 router.put('/admin/products/:id', productAdmin.update);
 router.delete('/admin/products/:id', productAdmin.destroy);
 
-// Banners
+// Banners & Hero Engine
 router.get('/admin/banners', bannerAdmin.index);
 router.get('/admin/banners/:id', bannerAdmin.show);
 router.post('/admin/banners', bannerAdmin.store);
 router.put('/admin/banners/:id', bannerAdmin.update);
 router.delete('/admin/banners/:id', bannerAdmin.destroy);
+router.get('/admin/hero-config', bannerAdmin.getConfig);
+router.post('/admin/hero-config', bannerAdmin.updateConfig);
 
 // Blogs
 router.get('/admin/blogs', blogAdmin.index);

@@ -47,9 +47,25 @@ async function processAndSaveWebp(buffer, folder = 'products') {
   const filePath = path.join(targetDir, filename);
 
   // Compress and convert to WEBP with sharp
-  await sharp(buffer)
+  const webpBuffer = await sharp(buffer)
     .webp({ quality: 85, effort: 4 })
-    .toFile(filePath);
+    .toBuffer();
+
+  fs.writeFileSync(filePath, webpBuffer);
+
+  // If Supabase Storage is configured, sync upload
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      await supabase.storage.from(folder).upload(filename, webpBuffer, {
+        contentType: 'image/webp',
+        upsert: true
+      });
+    } catch (e) {
+      console.warn(`[upload.helper] Supabase sync upload skipped:`, e.message);
+    }
+  }
 
   return {
     filename,

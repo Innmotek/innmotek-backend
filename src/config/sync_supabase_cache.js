@@ -14,7 +14,8 @@ async function syncCache() {
     'role_has_permissions', 'categories', 'brands', 'products', 'banners', 'blog_categories',
     'blogs', 'testimonials', 'faq_types', 'faqs', 'pages', 'services', 'plugins', 'projects',
     'project_images', 'images', 'catalogues', 'candidates', 'complains', 'complain_types',
-    'contact_forms', 'subscribers', 'failed_jobs', 'job_lists', 'migrations', 'password_resets'
+    'contact_forms', 'subscribers', 'failed_jobs', 'job_lists', 'migrations', 'password_resets',
+    'hero_settings'
   ];
 
   const colRes = await client.query(`
