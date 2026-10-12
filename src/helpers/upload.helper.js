@@ -91,8 +91,64 @@ async function processBase64Webp(base64Data, folder = 'products') {
   return await processAndSaveWebp(buffer, folder);
 }
 
+/**
+ * Process base64 document (PDF, DOC, etc.) or raw buffer and save to catalogues bucket.
+ * 
+ * @param {string} base64Data - Data URI or raw base64 string
+ * @param {string} originalName - Original filename with extension (e.g. spec.pdf)
+ * @param {string} folder - Target folder name (default: 'catalogues')
+ * @returns {Promise<{ filename: string, url: string }|null>}
+ */
+async function processBase64Document(base64Data, originalName = 'document.pdf', folder = 'catalogues') {
+  if (!base64Data || typeof base64Data !== 'string') return null;
+
+  let mimeType = 'application/pdf';
+  let ext = 'pdf';
+  if (originalName && originalName.includes('.')) {
+    ext = originalName.split('.').pop().toLowerCase();
+  }
+
+  const mimeMatch = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+  let rawBase64 = base64Data;
+  if (mimeMatch) {
+    mimeType = mimeMatch[1];
+    rawBase64 = mimeMatch[2];
+  }
+
+  const buffer = Buffer.from(rawBase64, 'base64');
+  const targetDir = path.resolve(__dirname, '../../../innotek-backend-OLD/public/frontend/images', folder);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const filename = `${crypto.randomUUID()}.${ext}`;
+  const filePath = path.join(targetDir, filename);
+  fs.writeFileSync(filePath, buffer);
+
+  // If Supabase Storage is configured, sync upload
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      await supabase.storage.from(folder).upload(filename, buffer, {
+        contentType: mimeType,
+        upsert: true
+      });
+    } catch (e) {
+      console.warn(`[upload.helper] Supabase document upload skipped:`, e.message);
+    }
+  }
+
+  return {
+    filename,
+    url: getImageUrl(folder, filename)
+  };
+}
+
 module.exports = {
   upload,
   processAndSaveWebp,
-  processBase64Webp
+  processBase64Webp,
+  processBase64Document
 };
+

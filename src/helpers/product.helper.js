@@ -74,6 +74,7 @@ function formatProductDetail(product) {
     warrenty: product.warrenty || null,
     specification: product.specification || null,
     installation: product.installation || null,
+    download: product.download || null,
     image: getImageUrl('products', product.image),
     seo_title: product.seo_title || null,
     seo_keyword: product.seo_keyword || null,

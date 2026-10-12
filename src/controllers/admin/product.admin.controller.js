@@ -21,7 +21,7 @@
 const db = require('../../config/database');
 const { getImageUrl } = require('../../config/storage');
 const { sendSuccess, sendError } = require('../../helpers/response.helper');
-const { processBase64Webp } = require('../../helpers/upload.helper');
+const { processBase64Webp, processBase64Document } = require('../../helpers/upload.helper');
 
 /**
  * Generate URL-friendly slug from string.
@@ -35,6 +35,45 @@ function slugify(text) {
     .replace(/[^\w\-]+/g, '')
     .replace(/\-\-+/g, '-');
 }
+
+/**
+ * Process downloadable brochures/spec sheets into clean JSON array string.
+ */
+async function parseAndProcessDownloads(rawDownload, rawDownloads) {
+  const payload = rawDownloads !== undefined ? rawDownloads : rawDownload;
+  if (!payload) return null;
+
+  let items = [];
+  if (Array.isArray(payload)) {
+    items = payload;
+  } else if (typeof payload === 'string' && payload.trim()) {
+    try {
+      const parsed = JSON.parse(payload);
+      items = Array.isArray(parsed) ? parsed : [{ title: 'Technical Brochure', file: payload.trim() }];
+    } catch {
+      return payload.trim();
+    }
+  }
+
+  const processed = [];
+  for (const item of items) {
+    if (!item) continue;
+    let fileUrl = item.file || item.url || '';
+    if (item.file_base64) {
+      const docRes = await processBase64Document(item.file_base64, item.filename || `${item.title || 'document'}.pdf`);
+      if (docRes) fileUrl = docRes.url;
+    }
+    if (fileUrl) {
+      processed.push({
+        title: item.title || 'Technical Brochure',
+        file: fileUrl
+      });
+    }
+  }
+
+  return processed.length > 0 ? JSON.stringify(processed) : null;
+}
+
 
 /**
  * List all products for Admin table.
@@ -141,6 +180,8 @@ async function store(req, res) {
       warrenty,
       specification,
       installation,
+      download,
+      downloads,
       featured_product,
       status,
       image_base64,
@@ -163,7 +204,10 @@ async function store(req, res) {
       if (processed) mainImageName = processed.filename;
     }
 
-    // 2. Insert master product record
+    // 2. Process downloadable brochures/specifications
+    const finalDownload = await parseAndProcessDownloads(download, downloads);
+
+    // 3. Insert master product record
     const newProduct = db.table('products').insert({
       title: title.trim(),
       slug: cleanSlug,
@@ -174,6 +218,7 @@ async function store(req, res) {
       warrenty: warrenty || null,
       specification: specification || null,
       installation: installation || null,
+      download: finalDownload,
       featured_product: featured_product ? 1 : 0,
       status: status !== undefined ? Number(status) : 1,
       image: mainImageName,
@@ -235,6 +280,8 @@ async function update(req, res) {
       warrenty,
       specification,
       installation,
+      download,
+      downloads,
       featured_product,
       status,
       image_base64,
@@ -252,7 +299,13 @@ async function update(req, res) {
       if (processed) mainImageName = processed.filename;
     }
 
-    // 2. Update product master
+    // 2. Process downloadable brochures/specifications if supplied
+    let finalDownload = undefined;
+    if (download !== undefined || downloads !== undefined) {
+      finalDownload = await parseAndProcessDownloads(download, downloads);
+    }
+
+    // 3. Update product master
     const updated = db.table('products').update(id, {
       title: title !== undefined ? title.trim() : existing.title,
       slug: slug !== undefined ? slugify(slug) : existing.slug,
@@ -263,6 +316,7 @@ async function update(req, res) {
       warrenty: warrenty !== undefined ? warrenty : existing.warrenty,
       specification: specification !== undefined ? specification : existing.specification,
       installation: installation !== undefined ? installation : existing.installation,
+      download: finalDownload !== undefined ? finalDownload : existing.download,
       featured_product: featured_product !== undefined ? (featured_product ? 1 : 0) : existing.featured_product,
       status: status !== undefined ? Number(status) : existing.status,
       image: mainImageName,
