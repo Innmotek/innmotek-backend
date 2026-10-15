@@ -202,6 +202,41 @@ app.get('/', (req, res) => {
 </html>`);
 });
 
+// Direct Live Database Sync Middleware (Option A)
+// Ensures any data added or modified in Supabase PostgreSQL is immediately synced before controller executes
+app.use('/api', async (req, res, next) => {
+  const path = req.path.toLowerCase();
+  const tables = [];
+
+  if (path.startsWith('/products') || path.startsWith('/category') || path.startsWith('/featured')) {
+    tables.push('products', 'categories', 'images');
+  } else if (path.startsWith('/banners') || path.startsWith('/hero-config')) {
+    tables.push('banners', 'hero_settings');
+  } else if (path.startsWith('/blogs')) {
+    tables.push('blogs', 'blog_categories');
+  } else if (path.startsWith('/projects')) {
+    tables.push('projects', 'project_images');
+  } else if (path.startsWith('/services')) {
+    tables.push('services');
+  } else if (path.startsWith('/testimonials')) {
+    tables.push('testimonials');
+  } else if (path.startsWith('/brands')) {
+    tables.push('brands');
+  } else if (path.startsWith('/faqs')) {
+    tables.push('faqs', 'faq_types');
+  } else if (path.startsWith('/pages')) {
+    tables.push('pages');
+  } else if (path.startsWith('/admin')) {
+    tables.push('products', 'categories', 'banners', 'blogs', 'projects', 'services', 'testimonials', 'brands', 'faqs', 'pages', 'images', 'catalogues');
+  }
+
+  if (tables.length > 0) {
+    await db.syncTables(tables, 3000);
+  }
+
+  next();
+});
+
 // Mount all API endpoints under /api
 app.use('/api', apiRoutes);
 

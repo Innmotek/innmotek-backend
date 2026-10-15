@@ -307,6 +307,8 @@ class Database {
     this.tableColumns = {};
     this.pool = null;
     this.isSupabaseConnected = false;
+    this.lastSyncTimes = {};
+    this.syncPromises = {};
     this.init();
   }
 
@@ -320,13 +322,87 @@ class Database {
         });
         this.isSupabaseConnected = true;
         this.loadFromSupabaseSync();
-        console.log('[DB] Connected to Supabase PostgreSQL (Persistence Active).');
+        this.startPeriodicSync(30000);
+        console.log('[DB] Connected to Supabase PostgreSQL (Live Direct Sync Active).');
         return;
       } catch (err) {
         console.error('[DB] Failed to connect to Supabase PostgreSQL, falling back to local dump:', err.message);
       }
     }
     this.loadSqlDump();
+  }
+
+  /**
+   * Sync a specific table directly from live PostgreSQL pool.
+   * Debounced with maxAgeMs (default: 3000ms = 3 seconds).
+   * Concurrent requests for the same table share the in-flight promise.
+   */
+  async syncTable(tableName, maxAgeMs = 3000) {
+    if (!this.pool) return;
+    const now = Date.now();
+    const lastSync = this.lastSyncTimes[tableName] || 0;
+    if (now - lastSync < maxAgeMs) {
+      return;
+    }
+
+    if (this.syncPromises[tableName]) {
+      return this.syncPromises[tableName];
+    }
+
+    this.syncPromises[tableName] = (async () => {
+      try {
+        const res = await this.pool.query(`SELECT * FROM "${tableName}";`);
+        if (this.tables[tableName]) {
+          this.tables[tableName].rows = res.rows;
+        } else {
+          const allowedCols = this.tableColumns[tableName] || (res.rows[0] ? Object.keys(res.rows[0]) : []);
+          this.tables[tableName] = new TableRepository(tableName, res.rows, this.pool, allowedCols);
+        }
+        this.lastSyncTimes[tableName] = Date.now();
+      } catch (err) {
+        console.warn(`[DB-Sync] Live sync warning for table "${tableName}":`, err.message);
+      } finally {
+        delete this.syncPromises[tableName];
+      }
+    })();
+
+    return this.syncPromises[tableName];
+  }
+
+  /**
+   * Sync multiple tables in parallel from live PostgreSQL.
+   */
+  async syncTables(tableNames = [], maxAgeMs = 3000) {
+    if (!Array.isArray(tableNames) || tableNames.length === 0) return;
+    await Promise.all(tableNames.map(t => this.syncTable(t, maxAgeMs)));
+  }
+
+  /**
+   * Unconditionally refresh all active operational tables.
+   */
+  async refreshAllAsync() {
+    const tables = [
+      'categories', 'brands', 'products', 'banners', 'blog_categories',
+      'blogs', 'testimonials', 'faq_types', 'faqs', 'pages', 'services',
+      'plugins', 'projects', 'project_images', 'images', 'catalogues',
+      'contact_forms', 'subscribers', 'hero_settings'
+    ];
+    await Promise.all(tables.map(t => this.syncTable(t, 0)));
+  }
+
+  /**
+   * Background periodic sync interval as an autonomous safety net.
+   */
+  startPeriodicSync(intervalMs = 30000) {
+    if (this.syncTimer) clearInterval(this.syncTimer);
+    this.syncTimer = setInterval(() => {
+      this.refreshAllAsync().catch(err => {
+        console.warn('[DB-Sync] Periodic safety net sync error:', err.message);
+      });
+    }, intervalMs);
+    if (this.syncTimer.unref) {
+      this.syncTimer.unref();
+    }
   }
 
   loadFromSupabaseSync() {
@@ -344,6 +420,7 @@ class Database {
       for (const [table, rows] of Object.entries(allData)) {
         const allowedCols = this.tableColumns[table] || [];
         this.tables[table] = new TableRepository(table, rows, this.pool, allowedCols);
+        this.lastSyncTimes[table] = Date.now();
       }
       console.log(`[DB] Successfully synced ${Object.keys(allData).length} tables from live Supabase PostgreSQL.`);
     } catch (e) {

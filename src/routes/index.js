@@ -58,6 +58,20 @@ async function handleHealthCheck(req, res) {
 
 router.get('/health', handleHealthCheck);
 
+// Direct Live Cache Refresh Hook
+router.get('/cache/refresh', async (req, res) => {
+  try {
+    await db.refreshAllAsync();
+    return res.json({
+      result: 'success',
+      message: 'All tables synced directly from live Supabase PostgreSQL',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ result: 'error', message: err.message });
+  }
+});
+
 // Mount authentication & admin management routes
 router.use('/', authRoutes);
 router.use('/', adminRoutes);
