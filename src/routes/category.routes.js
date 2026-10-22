@@ -14,6 +14,9 @@ const categoryController = require('../controllers/category.controller');
 // Master categories list with nested children
 router.get('/categories', categoryController.index);
 
+// Flat categories list for sitemaps and indexers
+router.get('/categories/all', categoryController.all);
+
 // Single category subcategories and metadata
 router.get('/category/:category', categoryController.show);
 

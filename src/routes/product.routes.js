@@ -18,6 +18,9 @@ router.get('/featured/products', featuredController.index);
 // Product detail with explicit /show suffix (as in Laravel api.php)
 router.get('/products/:product/show', productController.show);
 
+// All products across all categories (for catalog and dynamic sitemap)
+router.get('/products', productController.all);
+
 // Products by category
 router.get('/products/:category', productController.index);
 

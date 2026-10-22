@@ -136,8 +136,37 @@ function related(req, res) {
   }
 }
 
+/**
+ * List all active categories flat (for dynamic sitemaps and indexing).
+ * 
+ * Route: GET /api/categories/all
+ */
+function all(req, res) {
+  try {
+    const categories = db.table('categories')
+      .where('status', 1)
+      .orderBy('order', 'asc')
+      .get();
+
+    return sendSuccess(res, {
+      categories: categories.map(c => ({
+        id: c.id,
+        title: c.title,
+        slug: c.slug,
+        parent_category: c.parent_category,
+        updated_at: c.updated_at
+      }))
+    });
+  } catch (error) {
+    console.error('[CategoryController@all] Error:', error);
+    return sendError(res, 'Failed to fetch all categories', 500);
+  }
+}
+
 module.exports = {
   index,
   show,
-  related
+  related,
+  all
 };
+

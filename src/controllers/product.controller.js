@@ -104,7 +104,32 @@ function show(req, res) {
   }
 }
 
+/**
+ * List all active products across all categories.
+ * 
+ * Route: GET /api/products
+ */
+function all(req, res) {
+  try {
+    const products = db.table('products')
+      .where('status', 1)
+      .orderBy('title', 'asc')
+      .get();
+
+    const formattedProducts = formatProductList(products);
+
+    return sendSuccess(res, {
+      products: formattedProducts
+    });
+  } catch (error) {
+    console.error('[ProductController@all] Error:', error);
+    return sendError(res, 'Failed to fetch all products', 500);
+  }
+}
+
 module.exports = {
   index,
-  show
+  show,
+  all
 };
+
