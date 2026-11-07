@@ -91,6 +91,8 @@ function formatCategoryDetail(category) {
     title: category.title,
     parentLink,
     parentTitle,
+    description: category.description || null,
+    image: getImageUrl('categories', category.image),
     seo_title: category.seo_title || null,
     seo_keyword: category.seo_keyword || null,
     seo_description: category.seo_description || null
