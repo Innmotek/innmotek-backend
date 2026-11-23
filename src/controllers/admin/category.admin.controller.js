@@ -49,8 +49,12 @@ function index(req, res) {
     const formatted = categories.map(cat => {
       let parentTitle = null;
       let parentSlug = null;
-      if (cat.parent_id) {
-        const parent = db.table('categories').find(cat.parent_id);
+      const effectiveParentId = cat.parent_category !== undefined && cat.parent_category !== null
+        ? cat.parent_category
+        : cat.parent_id;
+
+      if (effectiveParentId) {
+        const parent = db.table('categories').find(effectiveParentId);
         if (parent) {
           parentTitle = parent.title;
           parentSlug = parent.slug;
@@ -66,7 +70,8 @@ function index(req, res) {
         id: cat.id,
         title: cat.title,
         slug: cat.slug,
-        parent_id: cat.parent_id || null,
+        parent_id: effectiveParentId ? Number(effectiveParentId) : null,
+        parent_category: effectiveParentId ? Number(effectiveParentId) : null,
         parent_title: parentTitle,
         parent_slug: parentSlug,
         status: cat.status !== undefined ? Number(cat.status) : 1,
@@ -101,8 +106,14 @@ function show(req, res) {
       return sendError(res, 'Category not found', 404);
     }
 
+    const effectiveParentId = category.parent_category !== undefined && category.parent_category !== null
+      ? category.parent_category
+      : category.parent_id;
+
     return sendSuccess(res, 'category', {
       ...category,
+      parent_id: effectiveParentId ? Number(effectiveParentId) : null,
+      parent_category: effectiveParentId ? Number(effectiveParentId) : null,
       image_url: getImageUrl('categories', category.image)
     });
   } catch (error) {
@@ -177,10 +188,19 @@ async function update(req, res) {
       if (processed) imageName = processed.filename;
     }
 
+    const effectiveExistingParent = existing.parent_category !== undefined && existing.parent_category !== null
+      ? existing.parent_category
+      : existing.parent_id;
+
+    const resolvedParentId = parent_id !== undefined
+      ? (parent_id ? Number(parent_id) : null)
+      : (effectiveExistingParent ? Number(effectiveExistingParent) : null);
+
     const updated = db.table('categories').update(id, {
       title: title !== undefined ? title.trim() : existing.title,
       slug: slug !== undefined ? slugify(slug) : existing.slug,
-      parent_id: parent_id !== undefined ? (parent_id ? Number(parent_id) : null) : existing.parent_id,
+      parent_id: resolvedParentId,
+      parent_category: resolvedParentId,
       description: description !== undefined ? description : existing.description,
       image: imageName,
       status: status !== undefined ? Number(status) : existing.status,

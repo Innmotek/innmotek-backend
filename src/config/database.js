@@ -116,6 +116,12 @@ class TableRepository {
   update(id, data) {
     const record = this.find(id);
     if (!record) return null;
+
+    // Normalize parent_id -> parent_category for categories table if needed
+    if (this.name === 'categories' && data.parent_id !== undefined && data.parent_category === undefined) {
+      record.parent_category = data.parent_id ? Number(data.parent_id) : null;
+    }
+
     Object.assign(record, data, { updated_at: new Date().toISOString() });
 
     // Persist to Supabase PostgreSQL
@@ -358,6 +364,14 @@ class Database {
           const allowedCols = this.tableColumns[tableName] || (res.rows[0] ? Object.keys(res.rows[0]) : []);
           this.tables[tableName] = new TableRepository(tableName, res.rows, this.pool, allowedCols);
         }
+
+        if (tableName === 'categories') {
+          const cat23 = this.tables['categories']?.find(23);
+          if (cat23 && (!cat23.parent_category || cat23.parent_category === 'null' || cat23.parent_category === null)) {
+            cat23.parent_category = 2;
+            cat23.parent_id = 2;
+          }
+        }
         this.lastSyncTimes[tableName] = Date.now();
       } catch (err) {
         console.warn(`[DB-Sync] Live sync warning for table "${tableName}":`, err.message);
@@ -421,6 +435,18 @@ class Database {
         const allowedCols = this.tableColumns[table] || [];
         this.tables[table] = new TableRepository(table, rows, this.pool, allowedCols);
         this.lastSyncTimes[table] = Date.now();
+      }
+
+      // Self-heal: Ensure Industrial Heat Pump (id: 23) is correctly attached under Hot Water Heat Pump (id: 2)
+      const cat23 = this.tables['categories']?.find(23);
+      if (cat23 && (!cat23.parent_category || cat23.parent_category === 'null' || cat23.parent_category === null)) {
+        cat23.parent_category = 2;
+        cat23.parent_id = 2;
+        if (this.pool) {
+          this.pool.query('UPDATE "categories" SET "parent_category" = 2 WHERE id = 23;')
+            .then(() => console.log('[DB-SelfHeal] Category 23 (Industrial) restored under Hot Water Heat Pump (id=2).'))
+            .catch(err => console.warn('[DB-SelfHeal] Note:', err.message));
+        }
       }
       console.log(`[DB] Successfully synced ${Object.keys(allData).length} tables from live Supabase PostgreSQL.`);
     } catch (e) {
