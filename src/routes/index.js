@@ -22,6 +22,9 @@ const faqRoutes = require('./faq.routes');
 const pageRoutes = require('./page.routes');
 const pluginRoutes = require('./plugin.routes');
 const subscriberRoutes = require('./subscriber.routes');
+const { router: mediaRouter } = require('./media.routes');
+const { cleanSupabaseOrphans } = require('../helpers/upload.helper');
+const { authenticateAdmin } = require('../middlewares/auth.middleware');
 
 const db = require('../config/database');
 
@@ -71,6 +74,25 @@ router.get('/cache/refresh', async (req, res) => {
     return res.status(500).json({ result: 'error', message: err.message });
   }
 });
+
+// Document & Media streaming pipeline with Render /tmp/ disk cache
+router.use('/media', mediaRouter);
+
+// Supabase Storage Orphan Purge Routine
+const orphanCleanupHandler = async (req, res) => {
+  try {
+    const report = await cleanSupabaseOrphans();
+    return res.json({
+      result: 'success',
+      message: `Orphan cleanup complete: purged ${report.purgedCount} orphaned file(s)`,
+      data: report
+    });
+  } catch (err) {
+    return res.status(500).json({ result: 'error', message: err.message });
+  }
+};
+router.post('/upload/cleanup-orphans', authenticateAdmin, orphanCleanupHandler);
+router.post('/admin/cleanup/cleanup-orphans', authenticateAdmin, orphanCleanupHandler);
 
 // Mount authentication & admin management routes
 router.use('/', authRoutes);

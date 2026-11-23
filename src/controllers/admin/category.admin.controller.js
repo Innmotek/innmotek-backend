@@ -20,7 +20,7 @@
 const db = require('../../config/database');
 const { getImageUrl } = require('../../config/storage');
 const { sendSuccess, sendError } = require('../../helpers/response.helper');
-const { processBase64Webp } = require('../../helpers/upload.helper');
+const { processBase64Webp, deleteFromStorage } = require('../../helpers/upload.helper');
 
 /**
  * Generate URL-friendly slug from string.
@@ -147,6 +147,7 @@ async function store(req, res) {
     const newCategory = db.table('categories').insert({
       title: title.trim(),
       slug: cleanSlug,
+      parent_category: parent_id ? String(parent_id) : null,
       parent_id: parent_id ? Number(parent_id) : null,
       description: description || null,
       image: imageName,
@@ -185,7 +186,12 @@ async function update(req, res) {
     let imageName = existing.image;
     if (image_base64) {
       const processed = await processBase64Webp(image_base64, 'categories');
-      if (processed) imageName = processed.filename;
+      if (processed) {
+        if (existing.image && existing.image !== processed.filename) {
+          deleteFromStorage('categories', existing.image);
+        }
+        imageName = processed.filename;
+      }
     }
 
     const effectiveExistingParent = existing.parent_category !== undefined && existing.parent_category !== null
@@ -193,13 +199,13 @@ async function update(req, res) {
       : existing.parent_id;
 
     const resolvedParentId = parent_id !== undefined
-      ? (parent_id ? Number(parent_id) : null)
-      : (effectiveExistingParent ? Number(effectiveExistingParent) : null);
+      ? (parent_id ? String(parent_id) : null)
+      : (effectiveExistingParent ? String(effectiveExistingParent) : null);
 
     const updated = db.table('categories').update(id, {
       title: title !== undefined ? title.trim() : existing.title,
       slug: slug !== undefined ? slugify(slug) : existing.slug,
-      parent_id: resolvedParentId,
+      parent_id: resolvedParentId ? Number(resolvedParentId) : null,
       parent_category: resolvedParentId,
       description: description !== undefined ? description : existing.description,
       image: imageName,
@@ -228,6 +234,15 @@ async function update(req, res) {
 function destroy(req, res) {
   try {
     const id = req.params.id;
+    const existing = db.table('categories').find(id);
+    if (!existing) {
+      return sendError(res, 'Category not found', 404);
+    }
+
+    if (existing.image) {
+      deleteFromStorage('categories', existing.image);
+    }
+
     const deleted = db.table('categories').delete(id);
     if (!deleted) {
       return sendError(res, 'Category not found', 404);

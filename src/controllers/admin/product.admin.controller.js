@@ -21,7 +21,7 @@
 const db = require('../../config/database');
 const { getImageUrl } = require('../../config/storage');
 const { sendSuccess, sendError } = require('../../helpers/response.helper');
-const { processBase64Webp, processBase64Document } = require('../../helpers/upload.helper');
+const { processBase64Webp, processBase64Document, deleteFromStorage } = require('../../helpers/upload.helper');
 
 /**
  * Generate URL-friendly slug from string.
@@ -296,7 +296,12 @@ async function update(req, res) {
     let mainImageName = existing.image;
     if (image_base64) {
       const processed = await processBase64Webp(image_base64, 'products');
-      if (processed) mainImageName = processed.filename;
+      if (processed) {
+        if (existing.image && existing.image !== processed.filename) {
+          deleteFromStorage('products', existing.image);
+        }
+        mainImageName = processed.filename;
+      }
     }
 
     // 2. Process downloadable brochures/specifications if supplied
@@ -328,6 +333,10 @@ async function update(req, res) {
     // 3. Handle gallery deletions
     if (Array.isArray(deleted_gallery_ids) && deleted_gallery_ids.length > 0) {
       deleted_gallery_ids.forEach(gId => {
+        const gRow = db.table('images').find(gId);
+        if (gRow && gRow.filename) {
+          deleteFromStorage('products', gRow.filename);
+        }
         db.table('images').delete(gId);
       });
     }
@@ -373,16 +382,28 @@ async function update(req, res) {
 function destroy(req, res) {
   try {
     const id = req.params.id;
-    const deleted = db.table('products').delete(id);
-    if (!deleted) {
+    const existing = db.table('products').find(id);
+    if (!existing) {
       return sendError(res, 'Product not found', 404);
+    }
+
+    if (existing.image) {
+      deleteFromStorage('products', existing.image);
     }
 
     // Also remove associated gallery images
     const gallery = db.table('images').where('product_id', id).get();
     gallery.forEach(img => {
+      if (img.filename) {
+        deleteFromStorage('products', img.filename);
+      }
       db.table('images').delete(img.id);
     });
+
+    const deleted = db.table('products').delete(id);
+    if (!deleted) {
+      return sendError(res, 'Product not found', 404);
+    }
 
     return sendSuccess(res, { message: 'Product deleted successfully', id: Number(id) });
   } catch (error) {
