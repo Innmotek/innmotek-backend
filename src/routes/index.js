@@ -24,7 +24,7 @@ const pluginRoutes = require('./plugin.routes');
 const subscriberRoutes = require('./subscriber.routes');
 const { router: mediaRouter } = require('./media.routes');
 const { cleanSupabaseOrphans } = require('../helpers/upload.helper');
-const { authenticateAdmin } = require('../middlewares/auth.middleware');
+const { authenticate, authenticateAdmin } = require('../middlewares/auth.middleware');
 
 const db = require('../config/database');
 
@@ -91,8 +91,8 @@ const orphanCleanupHandler = async (req, res) => {
     return res.status(500).json({ result: 'error', message: err.message });
   }
 };
-router.post('/upload/cleanup-orphans', authenticateAdmin, orphanCleanupHandler);
-router.post('/admin/cleanup/cleanup-orphans', authenticateAdmin, orphanCleanupHandler);
+router.post('/upload/cleanup-orphans', authenticate, orphanCleanupHandler);
+router.post('/admin/cleanup/cleanup-orphans', authenticate, orphanCleanupHandler);
 
 // Mount authentication & admin management routes
 router.use('/', authRoutes);
